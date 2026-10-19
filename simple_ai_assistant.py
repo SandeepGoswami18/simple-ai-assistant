@@ -30,41 +30,33 @@ while True:
             "content":user_input
         }
     )
-    response = client.chat.completions.create(
-        model=os.getenv("MODEL"),
-        messages=messages,
-        tools = TOOLS,
-    )
+   
+    #chained tool calling 
+    while True:
+            response = client.chat.completions.create(
+                    model=os.getenv("MODEL"),
+                    messages=messages,
+                    tools = TOOLS,
+                )
+            
+            msg = response.choices[0].message
 
-    msg = response.choices[0].message
+            if not msg.tool_calls:
+                break
+            messages.append(msg)
 
-    if msg.tool_calls:
-        messages.append(msg)
+            for tool_call in msg.tool_calls:
+                func_name = tool_call.function.name
+                func_arg = json.loads(tool_call.function.arguments or "{}")
 
-        for tool_call in msg.tool_calls:
-            func_name = tool_call.function.name
-            func_arg = json.loads(tool_call.function.arguments or "{}")
+                fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
+                result = fn(**func_arg)
 
-            fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
-            result = fn(**func_arg)
-
-            messages.append({
-                "role":"tool",
-                "tool_call_id": tool_call.id,
-                "content":str(result),
-            })
-
-        #2nd call to LLM API
-        response = client.chat.completions.create(
-            model = os.getenv("MODEL"),
-            messages = messages
-        )
-
-        msg = response.choices[0].message 
-
-
-
-
+                messages.append({
+                    "role":"tool",
+                    "tool_call_id": tool_call.id,
+                    "content":str(result),
+                })
     messages.append({
        "role": "assistant",
         "content":msg.content
