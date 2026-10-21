@@ -1,4 +1,5 @@
 from datetime import datetime
+from ddgs import DDGS
 import requests
 def get_current_time():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -24,6 +25,26 @@ def calculate_calculator(a,b,operation):
 
     else:
         return "Invalid operation"
+
+def web_search_tool(query):
+    results = DDGS().text(
+        query,
+        max_results = 5,
+        region = "in-en"
+    )
+    if not results:
+        return "result not found in web search"
+
+    formatted_results = []
+
+    for item in results:
+        formatted_results.append(
+            f"Title:{item.get('title','N/A')}\n"
+            f"URL:{item.get('href','N/A')}\n"
+            f"Snippet:{item.get('body','N/A')}"
+        )
+    return "\n\n".join(formatted_results)
+
     
 
 
@@ -91,6 +112,26 @@ TOOLS = [
                 "required":["a","b","operation"]
             }
         }
+    },
+    {
+        "type":"function",
+        "function": {
+            "name":"web_search_tool",
+            "description":("Search the internet for information,"
+            "recent news, technical documentation,"
+            "and other topics requiring web results."
+            ),
+            "parameters":{
+                "type":"object",
+                "properties":{
+                    "query":{
+                        "type":"string",
+                        "description":"The topic or question to search for."
+                    }
+                },
+                "required":["query"]
+            }
+        }
     }
 ]
 
@@ -100,4 +141,5 @@ FUNCTION_NAME_TO_FUNCTION_MAP = {
     "get_city_weather":get_city_weather, 
     "get_user_city":get_user_city,
     "calculate_calculator":calculate_calculator,
+    "web_search_tool":web_search_tool,
 }

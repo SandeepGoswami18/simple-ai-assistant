@@ -17,8 +17,13 @@ MAX_STEPS = 5
 
 messages.append(
     {
-        "role":"system",#behaviour of the agent 
-        "content":"Act Like a very humble agent and respond always under 20 words."#behaviour of the agent 
+            "role":"system",#behaviour of the agent 
+            "content": (
+                "You are a helpful AI agent. "
+                "Use web_search when the user asks for current information "
+                "or explicitly requests a web search. "
+                "Summarize search results accurately and concisely."
+            )
     }
 )
 while True:
