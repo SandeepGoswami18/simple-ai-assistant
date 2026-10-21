@@ -13,7 +13,7 @@ client = OpenAI(
 messages = []
 
 # safet limit : the max number of model rounds for ONE user operation
-MAX_STEPS = 5;
+MAX_STEPS = 5 
 
 messages.append(
     {
@@ -58,7 +58,9 @@ while True:
                     fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
                     result = fn(**func_arg)
                 except Exception as e:
-                     result = f"Error while running {func_name}"
+                     print(f"Tool error:{func_name}:{e}")
+                     result = f"Error while running {func_name}:{e}"
+
                      
                 messages.append({
                     "role":"tool",
