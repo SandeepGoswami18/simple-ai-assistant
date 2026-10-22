@@ -1,12 +1,15 @@
 from datetime import datetime
+from Utilities.utilities import log
 from ddgs import DDGS
 import requests
+import json
 def get_current_time():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def get_city_weather(city):
     url = f"https://wttr.in/{city}?format=3"
     response  = requests.get(url,timeout=10)
+    response.raise_for_status()#This is will raise https error if something goes wrong 
     return response.text
 def get_user_city():
     return "Banglore"
@@ -71,6 +74,7 @@ TOOLS = [
                     "description":"City to get the weather for."
                     }
                 },
+                "required":["city"]
             },
         },
     },
@@ -143,3 +147,19 @@ FUNCTION_NAME_TO_FUNCTION_MAP = {
     "calculate_calculator":calculate_calculator,
     "web_search_tool":web_search_tool,
 }
+
+def run_tool(tool_call):
+    func_name = tool_call.function.name
+    func_arg = {}
+
+    try:
+        func_arg = json.loads(tool_call.function.arguments or "{}")
+        print(f"🛠️  {func_name}({func_arg})")
+        fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
+        result = fn(**func_arg)
+    except Exception as e:
+            print(f"Tool error:{func_name}:{e}")
+            result = f"Error while running {func_name}:{e}"
+
+    print(f"  ⮑ {result}")
+    return str(result)

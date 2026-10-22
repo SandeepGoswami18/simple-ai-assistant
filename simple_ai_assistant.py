@@ -1,8 +1,14 @@
+#Standard library imports
+import os
+
+#Third-party imports
 from openai import OpenAI
 from dotenv import load_dotenv
-from tools import TOOLS,FUNCTION_NAME_TO_FUNCTION_MAP
-import json
-import os
+
+#Local modules
+from tools import TOOLS,run_tool
+from Utilities.utilities import log
+
 
 load_dotenv()#by default look for .env file and load all these value in the environment variable 
 
@@ -27,7 +33,7 @@ messages.append(
     }
 )
 while True:
-    user_input = input("\nCodeSan:")
+    user_input = input("\n👦🏻 SAM: ")
 
     if user_input.lower() in ["exit","quit","bye","goodbye"]:
         break
@@ -52,21 +58,12 @@ while True:
             if not msg.tool_calls:
                 break
 
+            log(f"Step {step+1}: model requested {len(msg.tool_calls)} tool calls")
+
             messages.append(msg)
 
             for tool_call in msg.tool_calls:
-                func_name = tool_call.function.name
-                func_arg = {}
-
-                try:
-                    func_arg = json.loads(tool_call.function.arguments or "{}")
-                    fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
-                    result = fn(**func_arg)
-                except Exception as e:
-                     print(f"Tool error:{func_name}:{e}")
-                     result = f"Error while running {func_name}:{e}"
-
-                     
+                result = run_tool(tool_call)
                 messages.append({
                     "role":"tool",
                     "tool_call_id": tool_call.id,
@@ -79,11 +76,11 @@ while True:
             "role": "assistant",
             "content": fallback
         })
-        print("Assistant: " + fallback)
+        print("🤖 Assistant: " + fallback)
         continue
 
     messages.append({
         "role": "assistant",
         "content": msg.content
     })
-    print("Assistant: " + msg.content)
+    print("🤖 Assistant: " + (msg.content or "")) 
