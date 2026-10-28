@@ -154,11 +154,10 @@ def run_tool(tool_call):
 
     try:
         func_arg = json.loads(tool_call.function.arguments or "{}")
-        print(f"🛠️  {func_name}({func_arg})")
+        log(f"🛠️  {func_name}({func_arg})")
         fn = FUNCTION_NAME_TO_FUNCTION_MAP[func_name]
         result = fn(**func_arg)
     except Exception as e:
-            print(f"Tool error:{func_name}:{e}")
             result = f"Error while running {func_name}:{e}"
 
     print(f"  ⮑ {result}")

@@ -1,5 +1,6 @@
 #Standard library imports
 import os
+from types import SimpleNamespace
 
 #Third-party imports
 from openai import OpenAI
@@ -32,8 +33,84 @@ messages.append(
             )
     }
 )
+
+def stream_chat(history):
+    stream = client.chat.completions.create(
+        model=os.getenv("MODEL"),
+        messages=history,
+        tools=TOOLS,
+        stream=True,
+    )
+
+    full_response = ""
+    calls = {}
+    label_printed = False
+
+    #Streaming started
+    try:
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+
+            #1. COntent Streaming : Do we have a content from the LLM
+            if delta.content:
+                if not label_printed:
+                    print("🤖 Assistant: ", end="", flush=True)
+                    label_printed = True
+                print(delta.content , end="", flush=True)
+                full_response += delta.content
+
+            #2 tool Call
+            for tc in (delta.tool_calls or []):
+                obj = calls.setdefault(
+                    tc.index,
+                    SimpleNamespace(id=None, function=SimpleNamespace(name="", arguments="")),
+                )
+                if tc.id:
+                    obj.id = tc.id
+                if tc.function and tc.function.name:
+                    obj.function.name += tc.function.name
+                if tc.function and tc.function.arguments:
+                    obj.function.arguments += tc.function.arguments
+
+    except KeyboardInterrupt:
+        print("\n {Stopped By You}")
+        calls = {}
+
+    if label_printed:
+        print()
+
+    calls_list = []
+    for key in sorted(calls):
+        calls_list.append(calls[key])
+
+    return full_response, calls_list
+
+def build_tool_call_payload(tool_call):
+    """
+    Converts our collected tool call into the dictionary formet
+    that the API except inside an assistant message 
+    """
+
+    payload = []
+    for tool_calls in tool_call:
+        tool_call_dict = {
+            "id":tool_calls.id,
+            "type":"function",
+            "function":{
+                "name":tool_calls.function.name,
+                "arguments":tool_calls.function.arguments,
+            },
+        }
+        payload.append(tool_call_dict)
+
+    return payload
+
+
 while True:
-    user_input = input("\n👦🏻 SAM: ")
+
+    user_input = input("💬 You: ")
 
     if user_input.lower() in ["exit","quit","bye","goodbye"]:
         break
@@ -47,28 +124,28 @@ while True:
    
     #chained tool calling  
     for step in range(MAX_STEPS):
-            response = client.chat.completions.create(
-                    model=os.getenv("MODEL"),
-                    messages=messages,
-                    tools = TOOLS,
-                )
+        full_response , tool_call = stream_chat(messages)
             
-            msg = response.choices[0].message
+        #msg = response.choices[0].message
 
-            if not msg.tool_calls:
-                break
+        if not tool_call:
+            break
 
-            log(f"Step {step+1}: model requested {len(msg.tool_calls)} tool calls")
+        log(f"Step {step+1}: model requested {len(tool_call)} tool calls")
 
-            messages.append(msg)
-
-            for tool_call in msg.tool_calls:
-                result = run_tool(tool_call)
-                messages.append({
-                    "role":"tool",
-                    "tool_call_id": tool_call.id,
-                    "content":str(result),
-                })
+        messages.append({
+            "role":"assistant",
+            "content": full_response,
+            "tool_calls":build_tool_call_payload(tool_call)
+        })
+    
+        for tool_call in tool_call:
+            result = run_tool(tool_call)
+            messages.append({
+                "role":"tool",
+                "tool_call_id": tool_call.id,
+                "content":str(result),
+            })
     else:
         # Ran out of steps; the model never gave a final answer.
         fallback = "Sorry, I could not finish this within the step limit."
@@ -80,7 +157,6 @@ while True:
         continue
 
     messages.append({
-        "role": "assistant",
-        "content": msg.content
+        "role":"assistant",
+        "content":full_response
     })
-    print("🤖 Assistant: " + (msg.content or "")) 
